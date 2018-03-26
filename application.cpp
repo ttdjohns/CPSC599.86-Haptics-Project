@@ -46,8 +46,8 @@ cWorld* world;
 
 // a camera to render the world in the window display
 cCamera* camera;
-double movementRate = 0.00001;
-cVector3d camPos = cVector3d(0.1, 0.0, 0.05);
+double movementRate = 0.0005;
+cVector3d camPos = cVector3d(0.20, 0.0, 0.05);
 cVector3d camLookAt = cVector3d(0.0, 0.0, 0.0);
 bool movingCamera = false;
 double rotSpeed = 0.5 * M_PI / 180.0;		// 0.5 degrees per haptic frame
@@ -287,14 +287,13 @@ int main(int argc, char* argv[])
     // define direction of light beam
     light->setDir(-1.0, 0.0, 0.0); 
 
-    // create a sphere (cursor) to represent the haptic device
-    //cursor = new cShapeSphere(0.01);
+    
+	const std::string courseNames[1] = { "courseBv5.3ds" };
 
-    // insert cursor inside world
-    //world->addChild(cursor);
+    // create the courses
 	for (int i = 0; i < 1; i++) {
 		course[i] = new cMultiMesh();
-		course[i]->loadFromFile("courseBv3.3ds"); //tray.obj"); //courseBv3.obj");
+		course[i]->loadFromFile(courseNames[i]); //tray.obj"); //courseBv3.obj");
 		course[i]->setLocalPos(course[i]->getLocalPos() + cVector3d(0.0, 0.0, -0.02));
 		course[i]->scale(1.0);
 		course[i]->createAABBCollisionDetector(ballR); //RADIUS OF TOOL
@@ -311,7 +310,7 @@ int main(int argc, char* argv[])
 		albedoMap->setUseMipmaps(true);
 		mesh->m_texture = albedoMap;
 		mesh->setUseTexture(true);
-		mesh->setHapticEnabled(true, true);
+		//mesh->setHapticEnabled(true, true);
 		//mesh->m_material->setTransparencyLevel(0);
 		//course[i]->m_material->setStaticFriction(0.5);
 		//course[i]->m_material->setDynamicFriction(0.3);
@@ -681,6 +680,15 @@ void updateHaptics(void)
 				cVector3d(0.0, 0.0, 1.0));   // direction of the (up) vector
 
 			tool->setLocalPos(tool->getLocalPos() + movementRate * offset);
+
+			cVector3d force(0, 0, 0);
+			cVector3d torque(0, 0, 0);
+			double gripperForce = 0.0;
+
+			force = -offset * 250.0;
+
+			hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
+			
 			/*
 			if (button1) {
 				cMatrix3d rot;
