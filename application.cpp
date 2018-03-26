@@ -615,7 +615,7 @@ void updateHaptics(void)
 			//left_hapticDevice->getUserSwitch(1, button1);
 		}
 		if (button2_counter >= buttonTimeout) {
-			hapticDevice->getUserSwitch(1, button1);
+			hapticDevice->getUserSwitch(2, button2);
 			//left_hapticDevice->getUserSwitch(1, button1);
 		}
 		if (button3_counter >= buttonTimeout) {
@@ -644,15 +644,17 @@ void updateHaptics(void)
 		}
 		else if (button1_counter < buttonTimeout) {
 			button1_counter++;
-		}
+		}*/
 
 		if (button2 == true) {
 			button2_counter = 0;
+			first = true;
+			printf("button 2 has been pressed, resetting the ball \n");
 		}
 		else if (button2_counter < buttonTimeout) {
 			button2_counter++;
 		}
-
+		/*
 		if (button3 == true) {
 			button3_counter = 0;
 		}
@@ -711,6 +713,10 @@ void updateHaptics(void)
 				ball->m_image->setLocalPos(ballAvatar);
 				ballVel = cVector3d(0.0, 0.0, 0.0);
 				first = false;
+				counter = 0;
+				ball->m_hapticPoint->m_sphereGoal->setLocalPos(ballAvatar);
+				ball->m_hapticPoint->m_sphereProxy->setLocalPos(ballAvatar);
+				ball->updateFromUser(ballAvatar, ballVel);
 			}
 
 			ball->updateFromUser(ballAvatar, ballVel);
