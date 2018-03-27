@@ -50,7 +50,8 @@ double movementRate = 0.0005;
 cVector3d camPos = cVector3d(0.20, 0.0, 0.05);
 cVector3d camLookAt = cVector3d(0.0, 0.0, 0.0);
 bool movingCamera = false;
-double rotSpeed = 0.5 * M_PI / 180.0;		// 0.5 degrees per haptic frame
+double rotSpeed = 0.04 * M_PI / 180.0;		// 0.5 degrees per haptic frame
+double rotation = 0.0;
 
 // a light source to illuminate the objects in the world
 cDirectionalLight *light;
@@ -91,6 +92,8 @@ const double b_ballSpring = 10.0;  // Ns/m spring dampening
 double deltaT = 0.001;
 boolean clubActive = false;
 const int buttonTimeout = 500;  // cycles of the haptic loop
+
+cToolCursor* ratetool;
 
 // flag to indicate if the haptic simulation currently running
 bool simulationRunning = false;
@@ -354,13 +357,10 @@ int main(int argc, char* argv[])
 	ball->start();
 	world->addChild(ball);
 
-
 	//get the 2nd haptic device for rate control  
-	// create a haptic device handler
-	left_handler = new cHapticDeviceHandler();
 
-	// get a handle to the first haptic device
-	left_handler->getDevice(left_hapticDevice, 1);
+	// get a handle to the second haptic device
+	handler->getDevice(left_hapticDevice, 1);
 
 	// open a connection to haptic device
 	left_hapticDevice->open();
@@ -369,10 +369,16 @@ int main(int argc, char* argv[])
 	left_hapticDevice->calibrate();
 
 	// retrieve information about the current haptic device
-	cHapticDeviceInfo left_info = left_hapticDevice->getSpecifications();
+	info = left_hapticDevice->getSpecifications();
 
 	// if the device has a gripper, enable the gripper to simulate a user switch
 	left_hapticDevice->setEnableGripperUserSwitch(true);
+
+	ratetool = new cToolCursor(world);
+	ratetool->setHapticDevice(left_hapticDevice);
+	ratetool->setRadius(0.0);
+	ratetool->start();
+	world->addChild(ratetool);
 
 	//--------------------------------------------------------------------------
     // WIDGETS
@@ -607,20 +613,20 @@ void updateHaptics(void)
 		button3 = false;
 
 		if (button0_counter >= buttonTimeout) {		// get button data
-			hapticDevice->getUserSwitch(0, button0);
-			//left_hapticDevice->getUserSwitch(0, button0);
+			//hapticDevice->getUserSwitch(0, button0);
+			left_hapticDevice->getUserSwitch(0, button0);
 		}
 		if (button1_counter >= buttonTimeout) {
-			hapticDevice->getUserSwitch(1, button1);
-			//left_hapticDevice->getUserSwitch(1, button1);
+			//hapticDevice->getUserSwitch(1, button1);
+			left_hapticDevice->getUserSwitch(1, button1);
 		}
 		if (button2_counter >= buttonTimeout) {
-			hapticDevice->getUserSwitch(2, button2);
-			//left_hapticDevice->getUserSwitch(1, button1);
+			//hapticDevice->getUserSwitch(2, button2);
+			left_hapticDevice->getUserSwitch(1, button1);
 		}
 		if (button3_counter >= buttonTimeout) {
-			hapticDevice->getUserSwitch(3, button3);
-			//left_hapticDevice->getUserSwitch(3, button3);
+			//hapticDevice->getUserSwitch(3, button3);
+			left_hapticDevice->getUserSwitch(3, button3);
 		}
 		
 		if (button0 == true) {										// if button was pressed, reset counter and toggle associated variable 
@@ -638,13 +644,13 @@ void updateHaptics(void)
 		else if (button0_counter < buttonTimeout) {
 			button0_counter++;
 		}
-		/*
+		
 		if (button1 == true) {										// button 1 (currently) allows the tool to move the camera
-			button1_counter = 0;
+			//button1_counter = 0;
 		}
 		else if (button1_counter < buttonTimeout) {
 			button1_counter++;
-		}*/
+		}
 
 		if (button2 == true) {
 			button2_counter = 0;
@@ -654,23 +660,57 @@ void updateHaptics(void)
 		else if (button2_counter < buttonTimeout) {
 			button2_counter++;
 		}
-		/*
+		
 		if (button3 == true) {
-			button3_counter = 0;
+			//button3_counter = 0;
 		}
 		else if (button3_counter < buttonTimeout) {
 			button3_counter++;
 		}
-		*/
+		
 		world->computeGlobalPositions();
 
         /////////////////////////////////////////////////////////////////////
         // READ HAPTIC DEVICE
         /////////////////////////////////////////////////////////////////////
+		// 
+		ratetool->updateFromDevice();
+		cVector3d offset;
+		left_hapticDevice->getPosition(offset);
+		camPos = camPos + movementRate * offset;
+		camLookAt = camLookAt + movementRate * offset;
+		
+		tool->setLocalPos(tool->getLocalPos() + movementRate * offset);
 
+		cVector3d force(0, 0, 0);
+		cVector3d torque(0, 0, 0);
+		double gripperForce = 0.0;
+
+		force = -offset * 250.0;
+
+		left_hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
+
+		if (button1) {
+			rotation += rotSpeed;
+			tool->rotateAboutLocalAxisRad(cVector3d(0.0, 0.0, 1.0), rotSpeed);
+			camPos = cVector3d((camPos.x() * cCosRad(rotSpeed) - camPos.y() * cSinRad(rotSpeed)), (camPos.y() * cCosRad(rotSpeed) + camPos.x() * cSinRad(rotSpeed)), camPos.z());
+		}
+		if (button3) {
+			rotation -= rotSpeed;
+			tool->rotateAboutLocalAxisRad(cVector3d(0.0, 0.0, 1.0), -rotSpeed);
+			camPos = cVector3d((camPos.x() * cCosRad(-rotSpeed) - camPos.y() * cSinRad(-rotSpeed)), (camPos.y() * cCosRad(-rotSpeed) + camPos.x() * cSinRad(-rotSpeed)), camPos.z());
+		}
+
+		camera->set(camPos,    // camera position (eye)
+			camLookAt,    // look at position (target)
+			cVector3d(0.0, 0.0, 1.0));   // direction of the (up) vector
+
+
+		//*/
         /////////////////////////////////////////////////////////////////////
         // UPDATE 3D CURSOR MODEL
         /////////////////////////////////////////////////////////////////////
+		// used to move when only have 1 device
 		if (movingCamera) {
 			tool->updateFromDevice();
 			cVector3d offset;
@@ -691,18 +731,14 @@ void updateHaptics(void)
 
 			hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
 			
-			/*
 			if (button1) {
-				cMatrix3d rot;
-				hapticDevice->getRotation(rot);
-				rot.setAxisAngleRotationRad(cVector3d(0.0, 0.0, 1.0), rotSpeed);
-				//hapticDevice->setLocalRot(rot);
+				rotation += rotSpeed;
+				tool->rotateAboutGlobalAxisRad(cVector3d(0.0, 0.0, 1.0), rotation);
 			}
 			if (button3) {
-				cMatrix3d rot = tool->getLocalRot();
-				rot.setAxisAngleRotationRad(cVector3d(0.0, 0.0, 1.0), -rotSpeed);
-				tool->setLocalRot(rot);
-			}*/
+				rotation -= rotSpeed;
+				tool->rotateAboutGlobalAxisRad(cVector3d(0.0, 0.0, 1.0), rotation);
+			}
 		}
 		else {
 			// update position and orienation of cursor
